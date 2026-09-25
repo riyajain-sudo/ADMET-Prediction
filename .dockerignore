@@ -1,0 +1,9 @@
+.venv
+**/__pycache__
+**/node_modules
+frontend/dist
+scripts
+tests
+data/raw/tox21.csv.gz
+*.md
+.git

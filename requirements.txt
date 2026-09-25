@@ -1,0 +1,18 @@
+# Exact pins: the .pkl models were trained with these versions, and pickled
+# scikit-learn models are not guaranteed to load on a different version.
+
+# Step 2: dataset download + exploration
+rdkit==2026.3.6
+pandas==3.0.5
+numpy==2.5.3
+
+# Step 4: training + benchmarking
+scikit-learn==1.9.1
+joblib==1.6.0
+
+# Step 5: SHAP explainability
+shap==0.52.0
+
+# Step 6: FastAPI backend
+fastapi==0.141.1
+uvicorn[standard]==0.53.0

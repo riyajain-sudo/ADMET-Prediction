@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.env
+
+# Too large for GitHub (tox21_rf.pkl alone is ~101MB, limit is 100MB); regenerate with scripts/train.py
+ml/models/*.pkl
+# Re-downloadable with scripts/download_data.py
+data/raw/
