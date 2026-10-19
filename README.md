@@ -57,8 +57,9 @@ SMILES -> ml/featurize.py -> 2048-bit Morgan fingerprint (+ bit -> atom map)
 - **One featurization function** (`ml/featurize.py`) is used by both training and
   inference, so the model can never be scored on features computed differently
   from how it was trained.
-- **SHAP explanations** credit each fingerprint bit's contribution to the single
-  atom at the center of the substructure that set it (a deliberate simplification).
+- **SHAP explanations** heuristically allocate each mapped fingerprint bit's
+  contribution across its unique center atoms; unmapped SHAP mass is retained as
+  a residual (not an atom-level decomposition).
 - **Chemistry stays in the backend**, including the 2D layout, so the frontend
   needs no chemistry library.
 
@@ -66,16 +67,26 @@ SMILES -> ml/featurize.py -> 2048-bit Morgan fingerprint (+ bit -> atom map)
 
 `POST /predict` with `{"smiles": "CC(=O)Oc1ccccc1C(=O)O"}` returns:
 
+The SMILES field is limited to 4,096 characters; invalid or oversized input returns `422`.
+
 | field | contents |
 |---|---|
 | `smiles` | the input, echoed unchanged (atom indices refer to this exact string's parse order) |
 | `structure` | `atoms` (index, element, x, y) and `bonds` (begin_atom, end_atom, order) |
-| `solubility` | `prediction` (log mol/L), `base_value`, `atom_contributions` |
-| `bbbp` | `prediction` (probability of permeable), `base_value`, `atom_contributions` |
-| `tox21` | one entry per assay (e.g. `NR-AR`), each with `prediction` (probability of a positive result), `base_value`, `atom_contributions` |
+| `solubility` | `prediction` (log mol/L), `base_value`, `atom_contributions`, `unmapped_contribution` |
+| `bbbp` | `prediction` (uncalibrated model score, not a calibrated probability), `base_value`, `atom_contributions`, `unmapped_contribution` |
+| `tox21` | one entry per assay (e.g. `NR-AR`), each with `prediction` (uncalibrated model score, not a calibrated probability), `base_value`, `atom_contributions`, `unmapped_contribution` |
 
-`atom_contributions` maps atom index to a signed score: positive pushed the
-prediction up, negative pushed it down. An invalid SMILES returns `422`.
+`atom_contributions` maps atom index to an approximate signed allocation: positive
+pushed the model output up, negative pushed it down. Each mapped fingerprint-bit
+contribution is divided among unique mapped center atoms. This is a heuristic,
+not an atom-level SHAP decomposition. `unmapped_contribution` retains absent-bit
+and otherwise unmapped SHAP mass, so `base_value + sum(atom_contributions) +
+unmapped_contribution` equals the model-space output (within numeric tolerance).
+BBBP/Tox21 values have not been calibration-tested and must not be interpreted
+as calibrated chances. `base_value` is the explainer reference in its model
+output space, not evidence of calibration or an average-molecule probability.
+ESOL returns a point estimate only; no prediction interval is provided.
 
 ## Model performance
 
@@ -96,6 +107,7 @@ Read these honestly:
   are far ahead.
 - **Tox21 is slightly below** the reference, and **BBBP is above** it.
 - Predictions are a research baseline, not a substitute for lab measurement.
+- The stored metrics above are historical report values; they were not rerun for this change. ROC AUC is a ranking metric and is not probability calibration evidence.
 
 ## Project layout
 

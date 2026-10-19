@@ -24,7 +24,7 @@ import joblib
 import pandas as pd
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from ml.depict import MoleculeLayout, compute_layout
 from ml.explain import Explanation, explain_fingerprint, make_explainer, sample_background
@@ -85,13 +85,16 @@ app.add_middleware(
 
 
 class PredictRequest(BaseModel):
-    smiles: str
+    # Bound parsing/featurization work for untrusted requests while allowing
+    # ordinary drug-like molecules with substantial stereochemical notation.
+    smiles: str = Field(..., max_length=4096)
 
 
 class PropertyResult(BaseModel):
     prediction: float
     base_value: float
     atom_contributions: dict[int, float]
+    unmapped_contribution: float
 
     @staticmethod
     def from_explanation(explanation: Explanation) -> "PropertyResult":
@@ -99,6 +102,7 @@ class PropertyResult(BaseModel):
             prediction=explanation.prediction,
             base_value=explanation.base_value,
             atom_contributions=explanation.atom_contributions,
+            unmapped_contribution=explanation.unmapped_contribution,
         )
 
 
