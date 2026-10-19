@@ -34,6 +34,11 @@ def test_missing_field_is_422(client):
     assert client.post("/predict", json={}).status_code == 422
 
 
+def test_oversized_smiles_is_rejected_before_featurization(client):
+    response = client.post("/predict", json={"smiles": "C" * 4097})
+    assert response.status_code == 422
+
+
 def test_echoes_input_smiles_unchanged(client):
     # Atom indices are keyed to the submitted string's parse order, so it must not be canonicalized.
     r = client.post("/predict", json={"smiles": NON_CANONICAL_ASPIRIN})

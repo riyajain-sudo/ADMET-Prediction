@@ -52,14 +52,21 @@ export default function App() {
         ? result.bbbp.atom_contributions
         : result.tox21[activeTox21Task].atom_contributions
     : null;
+  const activeResult = result
+    ? activeProperty === "solubility"
+      ? result.solubility
+      : activeProperty === "bbbp"
+        ? result.bbbp
+        : result.tox21[activeTox21Task]
+    : null;
 
   return (
     <div>
       <h1>ADMET Prediction</h1>
       <p className="subtitle">
         Paste a molecule's SMILES string to predict solubility, blood-brain
-        barrier permeability, and toxicity — with a visual explanation of
-        which atoms drove each prediction.
+        barrier permeability, and toxicity — with approximate atom-level
+        allocation of mapped fingerprint contributions.
       </p>
 
       <form onSubmit={handleSubmit} className="smiles-form">
@@ -79,27 +86,28 @@ export default function App() {
 
       {result && (
         <>
-          <MoleculeViewer structure={result.structure} contributions={activeContributions} />
+          <MoleculeViewer structure={result.structure} contributions={activeContributions}
+            unmappedContribution={activeResult?.unmapped_contribution} />
 
           <div className="prediction-cards">
             <PredictionCard
               title="Solubility"
               valueText={formatSolubility(result.solubility.prediction)}
-              description="Predicted aqueous solubility (log scale). Higher is more soluble."
+              description="Predicted aqueous solubility (log scale); point estimate, no interval provided."
               active={activeProperty === "solubility"}
               onClick={() => setActiveProperty("solubility")}
             />
             <PredictionCard
               title="BBB Permeability"
               valueText={formatProbability(result.bbbp.prediction)}
-              description="Probability the molecule crosses the blood-brain barrier."
+              description="Model score (not a calibrated probability) for BBB permeability."
               active={activeProperty === "bbbp"}
               onClick={() => setActiveProperty("bbbp")}
             />
             <PredictionCard
               title="Toxicity"
               valueText={formatProbability(result.tox21[activeTox21Task].prediction)}
-              description="Probability of a positive result in the selected Tox21 assay."
+              description="Model score (not a calibrated probability) for this assay."
               active={activeProperty === "tox21"}
               onClick={() => setActiveProperty("tox21")}
             >

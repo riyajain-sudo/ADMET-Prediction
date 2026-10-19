@@ -55,7 +55,7 @@ function BondLine({ begin, end, order }) {
   );
 }
 
-export default function MoleculeViewer({ structure, contributions }) {
+export default function MoleculeViewer({ structure, contributions, unmappedContribution }) {
   const { atoms, bonds } = structure;
   const { width, height, toSvg } = toLayout(atoms);
   const positions = atoms.map((a) => toSvg(a.x, a.y));
@@ -120,6 +120,7 @@ export default function MoleculeViewer({ structure, contributions }) {
         <div className="molecule-legend">
           <span><i className="swatch swatch-up" /> pushes prediction up</span>
           <span><i className="swatch swatch-down" /> pushes prediction down</span>
+          <span>Approximate atom allocation; unmapped SHAP residual: {Number(unmappedContribution ?? 0).toFixed(3)}</span>
         </div>
       )}
     </div>

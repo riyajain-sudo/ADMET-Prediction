@@ -20,18 +20,14 @@ feature_perturbation="interventional" fixes this and passes the check
 cleanly, so that combination is used everywhere below rather than the
 TreeExplainer default.
 
-Only fingerprint bits that are "on" (present in this molecule) appear in
-`bit_info` at all -- RDKit only records atom environments for bits that
-actually got set. So bits with input value 0 are skipped automatically:
-they have no atom to attribute to in *this* molecule, even though SHAP
-still assigns them a (irrelevant, for our purposes) contribution value.
+The atom view below is a heuristic allocation of the full fingerprint SHAP
+vector. Inactive bits and any active bit without a valid atom mapping are
+reported as an explicit residual; they are not silently dropped.
 
-Known simplification: each on-bit's bit_info records the ATOM AT THE CENTER
-of the substructure that set it, not every atom in that substructure's
-neighborhood. This credits one representative atom per bit rather than
-"smearing" credit across a whole neighborhood, which is what most published
-RDKit/SHAP fingerprint-interpretation examples do. It keeps the mapping
-simple and is revisitable later without changing anything else.
+Known simplification: bit environments may collide and may contain repeated
+center atoms. Each bit's contribution is divided equally across its unique
+mapped center atoms. This heuristic is not an atom-level SHAP decomposition;
+the returned residual preserves contribution mass that cannot be mapped.
 """
 
 from dataclasses import dataclass
@@ -62,7 +58,8 @@ class Explanation:
 
     prediction: float  # regression value, or probability of the positive class
     base_value: float  # explainer's baseline prediction, before any bit's contribution
-    atom_contributions: dict[int, float]  # atom_idx -> signed SHAP contribution (+push up, -push down)
+    atom_contributions: dict[int, float]  # heuristic share per atom, not atom-level SHAP
+    unmapped_contribution: float  # SHAP mass not assigned to atom centers
 
 
 def sample_background(smiles_list: list[str], n: int = BACKGROUND_SIZE, seed: int = 42) -> np.ndarray:
@@ -104,9 +101,19 @@ def explain_fingerprint(
     prediction = base_value + float(per_bit.sum())
 
     atom_contributions: dict[int, float] = {}
+    mapped_bit_indices: set[int] = set()
     for bit_index, environments in featurized.bit_info.items():
-        contribution = float(per_bit[bit_index])
-        for atom_idx, _radius in environments:
-            atom_contributions[atom_idx] = atom_contributions.get(atom_idx, 0.0) + contribution
+        unique_atoms = sorted({int(atom_idx) for atom_idx, _radius in environments
+                               if 0 <= int(atom_idx) < featurized.mol.GetNumAtoms()})
+        if not unique_atoms:
+            continue
+        mapped_bit_indices.add(int(bit_index))
+        share = float(per_bit[bit_index]) / len(unique_atoms)
+        for atom_idx in unique_atoms:
+            atom_contributions[atom_idx] = atom_contributions.get(atom_idx, 0.0) + share
 
-    return Explanation(prediction=prediction, base_value=base_value, atom_contributions=atom_contributions)
+    unmapped_contribution = float(sum(float(value) for i, value in enumerate(per_bit)
+                                      if i not in mapped_bit_indices))
+    return Explanation(prediction=prediction, base_value=base_value,
+                       atom_contributions=atom_contributions,
+                       unmapped_contribution=unmapped_contribution)
